@@ -1,0 +1,185 @@
+
+To run ALPR_ESP32 system in python through the terminal 
+
+
+
+python "c:\Users\HP\Python programming\alpr_esp32_system.py"
+
+
+
+
+
+
+
+
+
+
+
+THE CODE:
+
+# ============================================================
+# ALPR (Automatic License Plate Recognition) System
+# Simulation using OpenCV and Tesseract OCR
+# Image source: Local image file
+# ============================================================
+
+import cv2
+import pytesseract
+import os
+import numpy as np
+
+
+# ---- CONFIGURATION ----
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+
+# Path to your test image — change this to your image filename
+IMAGE_PATH = "test_plate.jpg"
+
+
+def load_image(path):
+    """Load image from disk and validate it exists."""
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Image not found: {path}")
+    image = cv2.imread(path)
+    if image is None:
+        raise ValueError("Image could not be loaded. Check the file format.")
+    return image
+
+
+def preprocess_image(image):
+    """Simple, clean preprocessing for plate detection."""
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    # Reduce noise
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+
+    # Simple threshold to get clear black/white image
+    thresh = cv2.adaptiveThreshold(blurred, 255,
+                cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                cv2.THRESH_BINARY, 11, 2)
+
+    edges = cv2.Canny(thresh, 50, 150)
+    cv2.imwrite("edges_debug.jpg", edges)
+
+    return gray, edges
+
+
+def find_plate_contour(edges, image):
+    """Find plate using simple bounding rect, no rotation."""
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours = sorted(contours, key=cv2.contourArea, reverse=True)[:30]
+
+    image_height = image.shape[0]
+    image_area = image.shape[0] * image.shape[1]
+    plate_contour = None
+    best_score = 0
+
+    for contour in contours:
+        x, y, w, h = cv2.boundingRect(contour)
+        aspect_ratio = w / float(h)
+        area = w * h
+
+        in_lower_half = y > image_height * 0.3
+
+        if 2.5 <= aspect_ratio <= 7.0 and 0.002 * image_area < area < 0.25 * image_area and in_lower_half:
+            score = 1 / (abs(aspect_ratio - 4.0) + 0.1)
+            if score > best_score:
+                best_score = score
+                # Store as simple rectangle points, no rotation
+                plate_contour = np.array([
+                    [x, y], [x+w, y], [x+w, y+h], [x, y+h]
+                ])
+
+    return plate_contour
+   
+   
+def extract_plate_region(gray, plate_contour):
+    x, y, w, h = cv2.boundingRect(plate_contour)
+    cropped_plate = gray[y:y+h, x:x+w]
+    cv2.imwrite("detected_region.jpg", cropped_plate)
+    return cropped_plate, x, y, w, h
+
+def read_plate_text(plate_image):
+    """
+    Use Tesseract OCR to extract text from the plate image.
+    Config: treat image as a single line of text.
+    """
+    config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    text = pytesseract.image_to_string(plate_image, config=config)
+    return text.strip()
+
+
+def draw_results(image, plate_contour, text, x, y, w, h):
+    """
+    Draw the detected plate boundary and recognized text on the image.
+    """
+    output = image.copy()
+
+    # Draw green contour around the plate
+    cv2.drawContours(output, [plate_contour], 0, (0, 255, 0), 3)
+
+    # Draw bounding box
+    cv2.rectangle(output, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+    # Put recognized text above the plate
+    cv2.putText(output, text, (x, y - 10),
+                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+    return output
+
+
+def run_alpr(image_path):
+    """Main pipeline: load → preprocess → detect → OCR → display."""
+
+    print("=" * 40)
+    print("  ALPR System - IoT Simulation")
+    print("=" * 40)
+
+    # Step 1: Load
+    print(f"\n[1] Loading image: {image_path}")
+    image = load_image(image_path)
+    print(f"    Image size: {image.shape[1]}x{image.shape[0]} px")
+
+    # Step 2: Preprocess
+    print("[2] Preprocessing image...")
+    gray, edges = preprocess_image(image)
+
+    # Step 3: Detect plate
+    print("[3] Detecting license plate...")
+    plate_contour = find_plate_contour(edges, image)
+
+    if plate_contour is None:
+        print("    [!] No license plate detected in this image.")
+        cv2.imshow("ALPR - No Plate Found", image)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+        return
+
+    print("    Plate region found.")
+
+    # Step 4: Extract plate region
+    print("[4] Extracting plate region...")
+    plate_image, x, y, w, h = extract_plate_region(gray, plate_contour)
+
+    # Step 5: OCR
+    print("[5] Running OCR...")
+    plate_text = read_plate_text(plate_image)
+
+    # Step 6: Output results
+    print("\n" + "=" * 40)
+    print(f"  Detected Plate: {plate_text if plate_text else 'Could not read text'}")
+    print("=" * 40)
+
+    # Step 7: Display annotated image
+    result_image = draw_results(image, plate_contour, plate_text, x, y, w, h)
+    cv2.imshow("ALPR Result", result_image)
+    cv2.imshow("Plate Region", plate_image)
+
+    print("\n[INFO] Press any key on the image window to exit.")
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+
+# ---- ENTRY POINT ----
+if __name__ == "__main__":
+    run_alpr(IMAGE_PATH)

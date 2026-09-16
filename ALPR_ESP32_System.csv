@@ -1,0 +1,8 @@
+"Reference","Qty","Value","DNP","Exclude from BOM","Exclude from Board","Footprint","Datasheet"
+"C1,C2","2","10uF","","","","Capacitor_THT:CP_Radial_D5.0mm_P2.00mm",""
+"J1","1","FTDI header","","","","Connector_PinHeader_1.00mm:PinHeader_1x04_P1.00mm_Horizontal",""
+"R1","1","10k","","","","Resistor_SMD:R_0805_2012Metric",""
+"R2,R3","2","4.7k","","","","Resistor_SMD:R_0805_2012Metric",""
+"U1","1","ESP32-WROOM-32","","","","RF_Module:ESP32-WROOM-32","https://www.espressif.com/sites/default/files/documentation/esp32-wroom-32_datasheet_en.pdf"
+"U2","1","AMS1117-3.3","","","","Package_TO_SOT_SMD:SOT-223-3_TabPin2","http://www.advanced-monolithic.com/pdf/ds1117.pdf"
+"U3","1","ER_OLEDM0.91_1x-I2C","","","","Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical","https://www.buydisplay.com/download/manual/ER-OLEDM0.91-1_Datasheet.pdf"
